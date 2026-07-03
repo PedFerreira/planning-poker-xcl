@@ -53,8 +53,25 @@ O plano completo de arquitetura está em `C:\Users\pferr\.claude\plans\polished-
       reveal; `curl`/fetch sem `x-sm-token` (e com token errado) no reveal
       retornam 403; cartas reveladas e estatísticas idênticas nos dois
       clients via broadcast realtime.
-- [ ] **Fase 4 — Rodadas e histórico.** Revotação ("Nova rodada"), "Próximo
-      ticket", histórico de rodadas reveladas na sala.
+- [x] **Fase 4 — Rodadas e histórico.** `POST /api/rooms/[roomId]/rounds`
+      (SM, `{mode:'revote'}` mesmo ticket / `{mode:'next', ticket...}` ticket
+      novo) sempre cria uma nova linha em `rounds`, exige a rodada atual já
+      revelada e faz broadcast `round_started`; ao receber o evento, cada
+      client reseta localmente sua própria seleção/`hasVoted` (a mesa é
+      Postgres-first, presence é auto-reportada); `RoomHeader` atualiza o
+      ticket ao vivo via estado, não mais via prop estática;
+      `GET /api/rooms/[roomId]/history` + `RoundHistory` listam as rodadas
+      já reveladas com resumo (consenso ou média/mediana ou distribuição).
+      *Critério de saída verificado ponta a ponta (build, typecheck, lint e
+      duas abas em contexts isolados):* "Nova rodada" reseta o estado de
+      votação nos dois clients mantendo a rodada anterior no histórico;
+      "Próximo ticket" atualiza o header ao vivo em ambos; histórico lista
+      as rodadas na ordem certa com os stats corretos.
+      Bug real encontrado e corrigido nessa fase: o `created_at`/`revealed_at`
+      que o Supabase devolve vem como `...+00:00`, formato que o Zod
+      `z.string().datetime()` rejeita silenciosamente (sem lançar erro
+      visível) — o evento `round_started` nunca chegava ao segundo
+      participante até normalizar para `.toISOString()` antes do broadcast.
 - [ ] **Fase 5 — Polimento.** Identidade visual XCL completa, layout
       responsivo, estados de erro/reconexão do canal Realtime, guia de
       deploy (Vercel/Supabase) e migração self-hosted.
