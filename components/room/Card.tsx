@@ -41,7 +41,9 @@ export function Card({
         >
           {label}
         </button>
-        <span className="pointer-events-none absolute inset-0 rounded-xl bg-primary [backface-visibility:hidden] [transform:rotateY(180deg)]" />
+        <span className="pointer-events-none absolute inset-0 flex items-center justify-center rounded-xl bg-primary text-[0.6em] font-bold tracking-wider text-primary-foreground/40 [backface-visibility:hidden] [transform:rotateY(180deg)]">
+          XCL
+        </span>
       </div>
     </div>
   );

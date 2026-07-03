@@ -14,10 +14,16 @@ import { DeckFooter } from "@/components/room/DeckFooter";
 import { ResultsPanel } from "@/components/room/ResultsPanel";
 import { RoundHistory } from "@/components/room/RoundHistory";
 import { NextTicketForm } from "@/components/room/NextTicketForm";
+import { ConnectionBanner } from "@/components/room/ConnectionBanner";
 import { Button } from "@/components/ui/button";
 import type { RoundStatus, RevealedVote, VoteStats } from "@/types/domain";
 import type { RealtimeEvent, RoundPublic } from "@/types/realtime";
-import type { RevealResponse, CreateRoundResponse, RoundHistoryEntry } from "@/types/api";
+import type {
+  RevealResponse,
+  CreateRoundResponse,
+  RoundHistoryEntry,
+  CurrentRoundResponse,
+} from "@/types/api";
 
 type RoundState = {
   id: string;
@@ -86,7 +92,12 @@ export function RoomClient({
     hydrate(null);
   }, [roomId, hydrate, scrumMasterName]);
 
-  const { participants, setHasVoted } = useRoomChannel(roomId, identity, handleRealtimeEvent);
+  const { participants, setHasVoted, connectionStatus } = useRoomChannel(
+    roomId,
+    identity,
+    handleRealtimeEvent,
+    resyncRound
+  );
 
   function applyNewRound(newRound: RoundPublic) {
     setRound({ id: newRound.id, status: newRound.status, votes: null, stats: null });
@@ -102,6 +113,28 @@ export function RoomClient({
     }
     if (event.type === "round_started") {
       applyNewRound(event.round);
+    }
+  }
+
+  // Postgres é a fonte de verdade: ao reconectar após ficar offline, refaz
+  // a leitura do estado atual pra cobrir qualquer broadcast perdido.
+  async function resyncRound() {
+    try {
+      const res = await fetch(`/api/rooms/${roomId}/round`);
+      if (!res.ok) return;
+      const data = (await res.json()) as CurrentRoundResponse;
+
+      const isNewRound = data.id !== round.id;
+      setRound({ id: data.id, status: data.status, votes: data.votes, stats: data.stats });
+      setTicket({ code: data.ticketCode, url: data.ticketUrl });
+
+      if (isNewRound) {
+        setSelectedCard(null);
+        clearOwnVote(roomId);
+        void setHasVoted(false);
+      }
+    } catch {
+      // sem sorte agora; a próxima reconexão tenta de novo
     }
   }
 
@@ -247,6 +280,8 @@ export function RoomClient({
 
   return (
     <div className="flex w-full max-w-3xl flex-col gap-6 pb-28">
+      <ConnectionBanner status={connectionStatus} />
+
       <RoomHeader
         projectName={projectName}
         scrumMasterName={scrumMasterName}

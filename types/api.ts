@@ -80,3 +80,13 @@ export const RoomHistoryResponseSchema = z.object({
   rounds: z.array(RoundHistoryEntrySchema),
 });
 export type RoomHistoryResponse = z.infer<typeof RoomHistoryResponseSchema>;
+
+export const CurrentRoundResponseSchema = z.object({
+  id: z.string().uuid(),
+  status: z.enum(["voting", "revealed"]),
+  ticketCode: z.string(),
+  ticketUrl: z.string().url().nullable(),
+  votes: z.array(RevealedVoteSchema).nullable(),
+  stats: VoteStatsSchema.nullable(),
+});
+export type CurrentRoundResponse = z.infer<typeof CurrentRoundResponseSchema>;

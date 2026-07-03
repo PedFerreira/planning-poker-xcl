@@ -12,23 +12,32 @@ import {
 } from "@/types/realtime";
 import type { StoredIdentity } from "@/lib/identity";
 
+export type ConnectionStatus = "connecting" | "connected" | "disconnected";
+
 export function useRoomChannel(
   roomId: string,
   identity: StoredIdentity | null,
-  onEvent?: (event: RealtimeEvent) => void
+  onEvent?: (event: RealtimeEvent) => void,
+  onReconnect?: () => void
 ) {
   const [participants, setParticipants] = useState<PresencePayload[]>([]);
+  const [connectionStatus, setConnectionStatus] = useState<ConnectionStatus>("connecting");
   const channelRef = useRef<RealtimeChannel | null>(null);
   const trackedPayloadRef = useRef<PresencePayload | null>(null);
+  const wasDisconnectedRef = useRef(false);
   const onEventRef = useRef(onEvent);
+  const onReconnectRef = useRef(onReconnect);
   useEffect(() => {
     onEventRef.current = onEvent;
+    onReconnectRef.current = onReconnect;
   });
 
   useEffect(() => {
     if (!identity) {
       return;
     }
+
+    wasDisconnectedRef.current = false;
 
     const channel = getRoomChannel(roomId, identity.participantId);
     channelRef.current = channel;
@@ -53,7 +62,11 @@ export function useRoomChannel(
 
     channel.subscribe(async (status) => {
       if (status === "SUBSCRIBED") {
-        const payload: PresencePayload = {
+        setConnectionStatus("connected");
+
+        // Numa reconexão, reaproveita o hasVoted já rastreado — só o
+        // primeiro subscribe começa do zero com hasVoted:false.
+        const payload: PresencePayload = trackedPayloadRef.current ?? {
           participantId: identity.participantId,
           name: identity.name,
           role: identity.role,
@@ -63,6 +76,14 @@ export function useRoomChannel(
         };
         trackedPayloadRef.current = payload;
         await channel.track(payload);
+
+        if (wasDisconnectedRef.current) {
+          wasDisconnectedRef.current = false;
+          onReconnectRef.current?.();
+        }
+      } else {
+        setConnectionStatus("disconnected");
+        wasDisconnectedRef.current = true;
       }
     });
 
@@ -84,5 +105,5 @@ export function useRoomChannel(
     await channel.track(next);
   }
 
-  return { participants, setHasVoted };
+  return { participants, setHasVoted, connectionStatus };
 }
