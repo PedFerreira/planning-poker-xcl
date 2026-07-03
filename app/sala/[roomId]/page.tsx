@@ -3,7 +3,8 @@ import { notFound } from "next/navigation";
 import { supabaseServer } from "@/lib/supabase/server";
 import { getDeck } from "@/config/decks";
 import { ScrumMasterTokenCapture } from "@/components/room/ScrumMasterTokenCapture";
-import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
+import { RoomClient } from "@/components/room/RoomClient";
+import { Header } from "@/components/layout/Header";
 
 export default async function RoomPage({
   params,
@@ -33,43 +34,21 @@ export default async function RoomPage({
   const deck = getDeck(room.deck_type);
 
   return (
-    <div className="flex min-h-screen flex-1 items-center justify-center px-4 py-12">
+    <div className="flex min-h-screen flex-1 flex-col">
       <Suspense fallback={null}>
         <ScrumMasterTokenCapture roomId={roomId} />
       </Suspense>
-      <Card className="w-full max-w-lg">
-        <CardHeader>
-          <CardTitle className="text-2xl">{room.project_name}</CardTitle>
-          <p className="text-sm text-muted-foreground">
-            Facilitador: {room.scrum_master_name} · Baralho: {deck?.name ?? room.deck_type}
-          </p>
-        </CardHeader>
-        <CardContent className="flex flex-col gap-2">
-          {round && (
-            <p className="text-sm">
-              Ticket atual: <span className="font-medium">{round.ticket_code}</span>
-              {round.ticket_url && (
-                <>
-                  {" "}
-                  ·{" "}
-                  <a
-                    href={round.ticket_url}
-                    target="_blank"
-                    rel="noopener noreferrer"
-                    className="underline"
-                  >
-                    abrir no Jira
-                  </a>
-                </>
-              )}
-            </p>
-          )}
-          <p className="text-sm text-muted-foreground">
-            Sala criada. Entrada de participantes e mesa de votação chegam nas
-            próximas fases.
-          </p>
-        </CardContent>
-      </Card>
+      <Header />
+      <div className="flex flex-1 items-center justify-center px-4 py-12">
+        <RoomClient
+          roomId={roomId}
+          projectName={room.project_name}
+          scrumMasterName={room.scrum_master_name}
+          deckName={deck?.name ?? room.deck_type}
+          ticketCode={round?.ticket_code}
+          ticketUrl={round?.ticket_url}
+        />
+      </div>
     </div>
   );
 }

@@ -88,6 +88,7 @@ export function CreateRoomForm() {
       <div className="grid gap-2">
         <Label htmlFor="deckType">Formato de votação</Label>
         <Select
+          items={DECK_LIST.map((deck) => ({ value: deck.key, label: deck.name }))}
           value={deckType}
           onValueChange={(value) => value && setDeckType(value)}
         >

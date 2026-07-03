@@ -20,9 +20,20 @@ O plano completo de arquitetura está em `C:\Users\pferr\.claude\plans\polished-
       sala funcionando (`POST /api/rooms` → redirect para `/sala/{roomId}`
       com token de Scrum Master capturado e removido da URL). Verificado
       ponta a ponta (build, typecheck, lint e navegador real).
-- [ ] **Fase 2 — Sala e presença.** Form de entrada (nome/cargo), identidade
-      persistida em sessionStorage, mesa renderizando participantes via
-      Supabase Presence em tempo real.
+- [x] **Fase 2 — Sala e presença.** Form de entrada (nome/cargo, incl.
+      "Outro"); identidade persistida em `sessionStorage` por sala
+      (`lib/identity.ts` + `store/useIdentityStore.ts`); mesa renderizando
+      participantes via Supabase Presence em tempo real
+      (`lib/realtime/channel.ts`, `lib/realtime/use-room-presence.ts`,
+      `components/room/VotingTable.tsx`); identidade visual placeholder da
+      XCL aplicada nos tokens de tema (`app/globals.css`) e no header
+      (`components/layout/`), adiantada da Fase 5 para já dar uma cara
+      "de produto" sem gerar retrabalho. Verificado ponta a ponta (build,
+      typecheck, lint e duas abas reais no navegador: entrada, presença em
+      tempo real entre abas e persistência de identidade no refresh).
+      Paleta é placeholder — trocar por cores/logo oficiais da XCL quando
+      disponíveis é uma troca pontual em `app/globals.css` e
+      `components/layout/Logo.tsx`.
 - [ ] **Fase 3 — Votação.** Baralho no rodapé, seleção de carta, estado
       "votou" na mesa, reveal restrito ao Scrum Master com flip 3D e painel
       de resultados (distribuição, média/mediana, consenso).
