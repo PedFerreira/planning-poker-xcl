@@ -19,7 +19,7 @@ export function ParticipantSeat({
       : participant.role;
 
   return (
-    <div className="flex w-24 flex-col items-center gap-1.5 text-center">
+    <div className="flex w-28 flex-col items-center gap-1.5 text-center">
       <div
         className="flex size-14 items-center justify-center rounded-full text-base font-semibold text-white ring-offset-2"
         style={{

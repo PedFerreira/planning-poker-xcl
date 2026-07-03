@@ -7,7 +7,7 @@
 @theme inline {
   --color-background: var(--background);
   --color-foreground: var(--foreground);
-  --font-sans: var(--font-sans);
+  --font-sans: var(--font-montserrat);
   --font-mono: var(--font-geist-mono);
   --font-heading: var(--font-sans);
   --color-sidebar-ring: var(--sidebar-ring);
@@ -43,6 +43,8 @@
   --color-success-foreground: var(--success-foreground);
   --color-brand: var(--brand);
   --color-brand-foreground: var(--brand-foreground);
+  --color-navy: var(--navy);
+  --color-felt: var(--felt);
   --radius-sm: calc(var(--radius) * 0.6);
   --radius-md: calc(var(--radius) * 0.8);
   --radius-lg: var(--radius);
@@ -52,81 +54,52 @@
   --radius-4xl: calc(var(--radius) * 2.6);
 }
 
+/*
+ * Paleta portada de xcl.digital (extraída de assets/css/styles.css):
+ * ink-950/900/850 para fundo/superfícies, vermelho de marca #E7113C como
+ * primária, navy #201A55 como acento secundário, texto muted #B5B5BB e
+ * bordas em branco translúcido (8–22%). O site da XCL não tem variante
+ * clara, então o dark vira o único tema — sem toggle, igual ao original.
+ */
 :root {
-  --background: oklch(1 0 0);
-  --foreground: oklch(0.18 0.02 264);
-  --card: oklch(1 0 0);
-  --card-foreground: oklch(0.18 0.02 264);
-  --popover: oklch(1 0 0);
-  --popover-foreground: oklch(0.18 0.02 264);
-  --primary: oklch(0.47 0.19 264);
-  --primary-foreground: oklch(0.985 0 0);
-  --secondary: oklch(0.96 0.012 264);
-  --secondary-foreground: oklch(0.3 0.03 264);
-  --muted: oklch(0.96 0.012 264);
-  --muted-foreground: oklch(0.5 0.02 264);
-  --accent: oklch(0.94 0.03 264);
-  --accent-foreground: oklch(0.3 0.05 264);
-  --destructive: oklch(0.577 0.245 27.325);
-  --border: oklch(0.91 0.012 264);
-  --input: oklch(0.91 0.012 264);
-  --ring: oklch(0.6 0.14 264);
-  --success: oklch(0.62 0.15 155);
-  --success-foreground: oklch(0.985 0 0);
+  --background: #0e0e10;
+  --foreground: #ffffff;
+  --card: #1a1a1a;
+  --card-foreground: #ffffff;
+  --popover: #1a1a1a;
+  --popover-foreground: #ffffff;
+  --primary: #e7113c;
+  --primary-foreground: #ffffff;
+  --secondary: #1f1f22;
+  --secondary-foreground: #ffffff;
+  --muted: #1f1f22;
+  --muted-foreground: #b5b5bb;
+  --accent: rgba(231, 17, 60, 0.12);
+  --accent-foreground: #e7113c;
+  --destructive: #e7113c;
+  --border: rgba(255, 255, 255, 0.08);
+  --input: rgba(255, 255, 255, 0.14);
+  --ring: #e7113c;
+  --success: oklch(0.75 0.16 155);
+  --success-foreground: #0e0e10;
   --brand: var(--primary);
   --brand-foreground: var(--primary-foreground);
-  --chart-1: oklch(0.87 0 0);
-  --chart-2: oklch(0.556 0 0);
-  --chart-3: oklch(0.439 0 0);
-  --chart-4: oklch(0.371 0 0);
-  --chart-5: oklch(0.269 0 0);
+  --navy: #201a55;
+  --felt: #123524;
+  --chart-1: #e7113c;
+  --chart-2: #b5b5bb;
+  --chart-3: #6b6b70;
+  --chart-4: #201a55;
+  --chart-5: #2a2a2d;
   --radius: 0.625rem;
-  --sidebar: oklch(0.985 0 0);
-  --sidebar-foreground: oklch(0.18 0.02 264);
-  --sidebar-primary: oklch(0.47 0.19 264);
-  --sidebar-primary-foreground: oklch(0.985 0 0);
-  --sidebar-accent: oklch(0.94 0.03 264);
-  --sidebar-accent-foreground: oklch(0.3 0.05 264);
-  --sidebar-border: oklch(0.91 0.012 264);
-  --sidebar-ring: oklch(0.6 0.14 264);
-}
-
-.dark {
-  --background: oklch(0.16 0.02 264);
-  --foreground: oklch(0.96 0.01 264);
-  --card: oklch(0.21 0.025 264);
-  --card-foreground: oklch(0.96 0.01 264);
-  --popover: oklch(0.21 0.025 264);
-  --popover-foreground: oklch(0.96 0.01 264);
-  --primary: oklch(0.72 0.14 264);
-  --primary-foreground: oklch(0.16 0.02 264);
-  --secondary: oklch(0.28 0.025 264);
-  --secondary-foreground: oklch(0.96 0.01 264);
-  --muted: oklch(0.28 0.025 264);
-  --muted-foreground: oklch(0.7 0.02 264);
-  --accent: oklch(0.32 0.05 264);
-  --accent-foreground: oklch(0.96 0.01 264);
-  --destructive: oklch(0.704 0.191 22.216);
-  --border: oklch(1 0 0 / 10%);
-  --input: oklch(1 0 0 / 15%);
-  --ring: oklch(0.6 0.14 264);
-  --success: oklch(0.7 0.15 155);
-  --success-foreground: oklch(0.16 0.02 264);
-  --brand: var(--primary);
-  --brand-foreground: var(--primary-foreground);
-  --chart-1: oklch(0.87 0 0);
-  --chart-2: oklch(0.556 0 0);
-  --chart-3: oklch(0.439 0 0);
-  --chart-4: oklch(0.371 0 0);
-  --chart-5: oklch(0.269 0 0);
-  --sidebar: oklch(0.21 0.025 264);
-  --sidebar-foreground: oklch(0.96 0.01 264);
-  --sidebar-primary: oklch(0.72 0.14 264);
-  --sidebar-primary-foreground: oklch(0.16 0.02 264);
-  --sidebar-accent: oklch(0.32 0.05 264);
-  --sidebar-accent-foreground: oklch(0.96 0.01 264);
-  --sidebar-border: oklch(1 0 0 / 10%);
-  --sidebar-ring: oklch(0.6 0.14 264);
+  --sidebar: #1a1a1a;
+  --sidebar-foreground: #ffffff;
+  --sidebar-primary: #e7113c;
+  --sidebar-primary-foreground: #ffffff;
+  --sidebar-accent: #1f1f22;
+  --sidebar-accent-foreground: #ffffff;
+  --sidebar-border: rgba(255, 255, 255, 0.08);
+  --sidebar-ring: #e7113c;
 }
 
 @layer base {
@@ -148,4 +121,15 @@
   to {
     transform: rotateY(0deg);
   }
+}
+
+/* Mesa de cassino para as telas de sala/votação — vinheta em verde de
+   feltro com um brilho vermelho sutil vindo do topo (o vermelho de marca),
+   por cima do ink-950 padrão. */
+.bg-casino {
+  background-color: var(--background);
+  background-image:
+    radial-gradient(ellipse 120% 60% at 50% 0%, rgba(231, 17, 60, 0.1), transparent 60%),
+    radial-gradient(ellipse 140% 90% at 50% 38%, var(--felt) 0%, #0c1712 45%, var(--background) 100%);
+  background-attachment: fixed;
 }

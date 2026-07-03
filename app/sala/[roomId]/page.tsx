@@ -33,7 +33,7 @@ export default async function RoomPage({
   const deck = getDeck(room.deck_type);
 
   return (
-    <div className="flex min-h-screen flex-1 flex-col">
+    <div className="bg-casino flex min-h-screen flex-1 flex-col">
       <Suspense fallback={null}>
         <ScrumMasterTokenCapture roomId={roomId} />
       </Suspense>

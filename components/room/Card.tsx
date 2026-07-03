@@ -1,4 +1,5 @@
 import { cn } from "@/lib/utils";
+import { XclMark } from "@/components/layout/XclMark";
 
 export function Card({
   label,
@@ -27,13 +28,14 @@ export function Card({
           animateReveal && "[animation:card-flip-in_0.5s_ease-out_forwards]"
         )}
       >
+        {/* Face: carta em tom marfim, como uma carta de baralho de verdade. */}
         <button
           type="button"
           disabled={disabled}
           onClick={onClick}
           className={cn(
-            "absolute inset-0 flex items-center justify-center rounded-xl border-2 bg-card font-bold [backface-visibility:hidden]",
-            selected ? "border-primary text-primary ring-2 ring-primary/30" : "border-border text-foreground",
+            "absolute inset-0 flex items-center justify-center rounded-xl border-2 bg-[#F7F1E3] font-bold text-[#1c1712] [backface-visibility:hidden]",
+            selected ? "border-primary ring-2 ring-primary/30" : "border-[#1c1712]/15",
             interactive && !disabled && "hover:border-primary/60",
             disabled && "opacity-50",
             !interactive && "cursor-default"
@@ -41,8 +43,17 @@ export function Card({
         >
           {label}
         </button>
-        <span className="pointer-events-none absolute inset-0 flex items-center justify-center rounded-xl bg-primary text-[0.6em] font-bold tracking-wider text-primary-foreground/40 [backface-visibility:hidden] [transform:rotateY(180deg)]">
-          XCL
+
+        {/* Verso: vermelho de marca com textura e a marca XCL ao centro. */}
+        <span
+          className="pointer-events-none absolute inset-0 overflow-hidden rounded-xl bg-primary [backface-visibility:hidden] [transform:rotateY(180deg)]"
+          style={{
+            backgroundImage:
+              "repeating-linear-gradient(135deg, rgba(255,255,255,0.07) 0px 6px, transparent 6px 12px)",
+          }}
+        >
+          <span className="absolute inset-[3px] rounded-[10px] border border-white/20" />
+          <XclMark className="absolute inset-0 m-auto h-1/2 w-1/2 text-white/25" />
         </span>
       </div>
     </div>
