@@ -1,12 +1,17 @@
 import { colorForParticipant, initials } from "@/lib/avatar";
+import { Card } from "@/components/room/Card";
 import type { PresencePayload } from "@/types/realtime";
 
 export function ParticipantSeat({
   participant,
   isSelf,
+  revealed,
+  revealedLabel,
 }: {
   participant: PresencePayload;
   isSelf: boolean;
+  revealed: boolean;
+  revealedLabel?: string;
 }) {
   const roleLabel =
     participant.role === "Outro" && participant.roleOther
@@ -31,16 +36,26 @@ export function ParticipantSeat({
       <p className="w-full truncate text-[0.65rem] text-muted-foreground">
         {roleLabel}
       </p>
-      <span
-        className={
-          "rounded-full px-2 py-0.5 text-[0.65rem] font-medium " +
-          (participant.hasVoted
-            ? "bg-success/15 text-success"
-            : "bg-muted text-muted-foreground")
-        }
-      >
-        {participant.hasVoted ? "Votou" : "Aguardando"}
-      </span>
+      {revealed ? (
+        revealedLabel ? (
+          <Card label={revealedLabel} size="sm" animateReveal />
+        ) : (
+          <span className="rounded-full bg-muted px-2 py-0.5 text-[0.65rem] font-medium text-muted-foreground">
+            Não votou
+          </span>
+        )
+      ) : (
+        <span
+          className={
+            "rounded-full px-2 py-0.5 text-[0.65rem] font-medium " +
+            (participant.hasVoted
+              ? "bg-success/15 text-success"
+              : "bg-muted text-muted-foreground")
+          }
+        >
+          {participant.hasVoted ? "Votou" : "Aguardando"}
+        </span>
+      )}
     </div>
   );
 }

@@ -140,3 +140,12 @@
     @apply font-sans;
   }
 }
+
+@keyframes card-flip-in {
+  from {
+    transform: rotateY(180deg);
+  }
+  to {
+    transform: rotateY(0deg);
+  }
+}

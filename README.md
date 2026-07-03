@@ -24,7 +24,7 @@ O plano completo de arquitetura está em `C:\Users\pferr\.claude\plans\polished-
       "Outro"); identidade persistida em `sessionStorage` por sala
       (`lib/identity.ts` + `store/useIdentityStore.ts`); mesa renderizando
       participantes via Supabase Presence em tempo real
-      (`lib/realtime/channel.ts`, `lib/realtime/use-room-presence.ts`,
+      (`lib/realtime/channel.ts`, `lib/realtime/use-room-channel.ts`,
       `components/room/VotingTable.tsx`); identidade visual placeholder da
       XCL aplicada nos tokens de tema (`app/globals.css`) e no header
       (`components/layout/`), adiantada da Fase 5 para já dar uma cara
@@ -34,9 +34,25 @@ O plano completo de arquitetura está em `C:\Users\pferr\.claude\plans\polished-
       Paleta é placeholder — trocar por cores/logo oficiais da XCL quando
       disponíveis é uma troca pontual em `app/globals.css` e
       `components/layout/Logo.tsx`.
-- [ ] **Fase 3 — Votação.** Baralho no rodapé, seleção de carta, estado
-      "votou" na mesa, reveal restrito ao Scrum Master com flip 3D e painel
-      de resultados (distribuição, média/mediana, consenso).
+- [x] **Fase 3 — Votação.** `DeckFooter` + `Card` (flip 3D em CSS puro, sem
+      JS orquestrando estado — anima via `@keyframes` no mount);
+      seleção/retirada de voto (`POST`/`DELETE /api/rounds/[roundId]/votes`,
+      upsert, rejeita `Observador` e cartas fora do baralho); destaque da
+      própria carta restaurado via `sessionStorage`
+      (`lib/vote-storage.ts`) sem nunca trafegar o valor pelo servidor;
+      `GET /vote-status` autoritativo (só `{hasVoted}`); reveal restrito ao
+      Scrum Master (`lib/sm-auth.ts`, `x-sm-token`) com cálculo de stats
+      (`lib/stats.ts`) e broadcast via REST (`channel.httpSend`, sem precisar
+      manter socket aberto no Route Handler — resolve o risco em aberto da
+      Fase 0); `ResultsPanel` com distribuição, média/mediana/mín/máx
+      (só Fibonacci) e indicador de consenso, seguindo o padrão de série
+      única de uma cor da skill de dataviz.
+      *Critério de saída verificado ponta a ponta (build, typecheck, lint e
+      duas abas reais, cada uma em um browser context isolado):*
+      `cardValue` nunca aparece no DOM nem em resposta de API antes do
+      reveal; `curl`/fetch sem `x-sm-token` (e com token errado) no reveal
+      retornam 403; cartas reveladas e estatísticas idênticas nos dois
+      clients via broadcast realtime.
 - [ ] **Fase 4 — Rodadas e histórico.** Revotação ("Nova rodada"), "Próximo
       ticket", histórico de rodadas reveladas na sala.
 - [ ] **Fase 5 — Polimento.** Identidade visual XCL completa, layout

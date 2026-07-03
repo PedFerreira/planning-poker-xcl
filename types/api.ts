@@ -1,5 +1,7 @@
 import { z } from "zod";
 import { DECK_LIST } from "@/config/decks";
+import { ParticipantRoleSchema } from "@/types/realtime";
+import { VoteStatsSchema, RevealedVoteSchema } from "@/types/realtime";
 
 const deckKeys = DECK_LIST.map((deck) => deck.key) as [string, ...string[]];
 
@@ -18,3 +20,28 @@ export const CreateRoomResponseSchema = z.object({
   scrumMasterToken: z.string(),
 });
 export type CreateRoomResponse = z.infer<typeof CreateRoomResponseSchema>;
+
+export const CastVoteRequestSchema = z.object({
+  participantId: z.string().min(1).max(32),
+  participantName: z.string().trim().min(1).max(60),
+  participantRole: ParticipantRoleSchema,
+  cardValue: z.string().min(1).max(20),
+});
+export type CastVoteRequest = z.infer<typeof CastVoteRequestSchema>;
+
+export const RetractVoteRequestSchema = z.object({
+  participantId: z.string().min(1).max(32),
+});
+export type RetractVoteRequest = z.infer<typeof RetractVoteRequestSchema>;
+
+export const VoteStatusResponseSchema = z.object({
+  hasVoted: z.boolean(),
+});
+export type VoteStatusResponse = z.infer<typeof VoteStatusResponseSchema>;
+
+export const RevealResponseSchema = z.object({
+  revealedAt: z.string().datetime(),
+  votes: z.array(RevealedVoteSchema),
+  stats: VoteStatsSchema,
+});
+export type RevealResponse = z.infer<typeof RevealResponseSchema>;
