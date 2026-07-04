@@ -1,5 +1,17 @@
 import { ShareLink } from "@/components/room/ShareLink";
 
+// Defesa em profundidade: mesmo com a validação em types/api.ts (só https +
+// allowlist de host), nunca renderiza um href que não seja http(s) — cobre
+// qualquer dado antigo/gravado por outro caminho antes dessa validação existir.
+function isRenderableHttpUrl(value: string): boolean {
+  try {
+    const url = new URL(value);
+    return url.protocol === "http:" || url.protocol === "https:";
+  } catch {
+    return false;
+  }
+}
+
 export function RoomHeader({
   projectName,
   scrumMasterName,
@@ -23,7 +35,7 @@ export function RoomHeader({
         {ticketCode && (
           <p className="mt-1 text-sm">
             Ticket atual: <span className="font-medium">{ticketCode}</span>
-            {ticketUrl && (
+            {ticketUrl && isRenderableHttpUrl(ticketUrl) && (
               <>
                 {" "}
                 ·{" "}

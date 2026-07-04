@@ -101,6 +101,105 @@ O plano completo de arquitetura está em `C:\Users\pferr\.claude\plans\polished-
       'standalone'` do Next.js, mas só o build (`npm run build`) foi
       verificado, não o `docker build`/`docker run` em si.
 
+## Segurança
+
+Revisão de segurança feita antes da apresentação do projeto, cobrindo o
+código-fonte completo (não é uma skill/ferramenta automatizada — foi uma
+auditoria manual guiada por OWASP Top 10, gestão de segredos e o modelo de
+ameaça específico deste app).
+
+### Corrigido nesta revisão
+
+- **XSS via link do ticket.** `ticketUrl` era validado só com `z.string().url()`,
+  que aceita qualquer esquema — inclusive `javascript:` — e era renderizado
+  direto como `<a href>` em `RoomHeader`. Como qualquer pessoa cria uma sala
+  sem login, isso era um vetor de XSS/roubo do token de Scrum Master
+  explorável por qualquer um. Corrigido em duas camadas: validação em
+  `types/api.ts` (só `https` + allowlist de host, configurável via
+  `ALLOWED_TICKET_URL_HOSTS` no `.env`) e um guard de defesa em profundidade em
+  `RoomHeader.tsx` que só renderiza o link se o esquema for `http(s)`.
+- **Content-Security-Policy e headers de segurança.** Adicionados em
+  `next.config.ts`: CSP (restringe scripts/estilos/conexões a `'self'` + host
+  do Supabase), `X-Frame-Options: DENY` / `frame-ancestors 'none'`
+  (clickjacking), `X-Content-Type-Options: nosniff`, `Referrer-Policy`,
+  `Permissions-Policy` e `Strict-Transport-Security`.
+
+### Riscos aceitos (baixo impacto dado o objetivo funcional da ferramenta)
+
+Nenhum dado sensível trafega pelo app (só nome, cargo e voto de estimativa,
+sem login/PII). Os pontos abaixo foram identificados na revisão mas não
+corrigidos agora por não colocarem em risco dados sensíveis nem o sistema
+como um todo — documentados aqui para referência futura:
+
+- Participante consegue votar/retirar voto de outro participante da mesma
+  sala (o `participantId` é visível via Presence a todos da sala; os
+  endpoints de voto não verificam posse). Afeta só a integridade da estimativa
+  dentro de uma sessão, não expõe dado de fora dela.
+- Eventos de Realtime (`round_started`, `cards_revealed`, etc.) são aceitos
+  pelo client com checagem de formato (Zod) mas sem verificar se vieram
+  mesmo do servidor — ver seção "Configuração adicional no Supabase" abaixo
+  para o caminho de correção, se decidirem endurecer isso no futuro.
+- Sem rate limiting em `/api/rooms` (criação de sala) — permite spam de
+  salas/rounds por um script, sem autenticação.
+- Token de Scrum Master fica em `localStorage` (não expira ao fechar a aba).
+
+### Configuração adicional recomendada no Supabase
+
+Nenhuma é obrigatória para o app funcionar — são endurecimentos adicionais
+possíveis no projeto Supabase, fora do escopo do código:
+
+- **Realtime Authorization (canais privados).** Hoje o canal
+  `room:{roomId}` é público: qualquer cliente com a anon key (pública, vai no
+  bundle do browser) pode se conectar e, em tese, publicar eventos forjados
+  nele — não há autenticação de participante, só de Scrum Master via
+  `x-sm-token` nas rotas de API. Dá pra reduzir isso configurando canais como
+  `private: true` + policies de RLS na tabela `realtime.messages` (ver
+  [docs do Supabase sobre Realtime Authorization](https://supabase.com/docs/guides/realtime/authorization)).
+  Como este app não usa Supabase Auth (não há login), a policy de RLS não
+  consegue diferenciar participantes entre si — o ganho seria bloquear
+  clientes totalmente fora do app, não impersonação entre participantes da
+  mesma sala. Requer mudança de código além da config; me avisem se quiserem
+  que eu implemente.
+- **Limpeza automática de salas antigas.** Já é um risco em aberto anotado
+  no plano original (ver "Status do projeto" acima) — configurar `pg_cron` no
+  Postgres do Supabase (ou Vercel Cron, se for esse o host) pra apagar salas
+  com `last_activity_at` > 7 dias reduz a superfície de dados (código/URL de
+  ticket, nomes) retidos indefinidamente.
+- **Network Restrictions** (disponível em planos pagos do Supabase): restringe
+  o acesso ao Postgres por IP — relevante se o app for hospedado com IP fixo
+  (ex.: atrás de um proxy corporativo).
+- Confirmar que a `SUPABASE_SERVICE_ROLE_KEY` de produção fica só no cofre de
+  secrets da plataforma de hosting (Vercel Environment Variables ou
+  equivalente interno), nunca em chat/e-mail — o `Dockerfile` já garante que
+  ela não é embutida na imagem de build (ver comentário nele).
+
+### Pontos que dependem de política da empresa — levar ao time de segurança
+
+Estes pontos não são visíveis a partir só deste repositório; surgiram na
+discussão sobre hospedar o app num subdomínio da XCL e dependem de como a
+infraestrutura da empresa é configurada como um todo. Antes de publicar em
+produção num subdomínio corporativo, vale confirmar com o time de segurança:
+
+- **Escopo de cookies do domínio pai.** Se algum outro sistema da empresa usa
+  cookies com `Domain=.xcl.digital` (SSO, intranet, etc.) sem `HttpOnly`, um
+  XSS neste app (mesmo que hoje mitigado) poderia, em tese, ler/usar cookies
+  de sessão de outros sistemas — o raio de ação de uma falha aqui deixa de
+  ser só este app.
+- **Confiança em wildcard de subdomínio.** Verificar se outros apps em
+  `*.xcl.digital` usam `document.domain` relaxado ou CSP/CORS que confiam no
+  domínio pai inteiro — isso tornaria este app um pivô possível contra eles
+  se comprometido.
+- **Higiene de DNS / subdomain takeover.** Quando este app for desativado ou
+  trocar de hosting, remover o registro DNS (CNAME) do subdomínio — um
+  registro "órfão" ainda apontando pra um provedor (Vercel, etc.) é um vetor
+  clássico de takeover de subdomínio.
+- **Link do ticket como vetor de phishing interno.** Mesmo com o allowlist de
+  host implementado, o app permite a qualquer pessoa sem login criar uma sala
+  e compartilhar o link — hospedado num domínio da empresa, isso aumenta a
+  credibilidade percebida por quem recebe. Vale considerar se algum controle
+  adicional (ex.: SSO na criação de sala) faz sentido dependendo de como o
+  link será divulgado internamente.
+
 ## Rodando localmente
 
 1. Instale as dependências:
@@ -117,6 +216,9 @@ O plano completo de arquitetura está em `C:\Users\pferr\.claude\plans\polished-
    NEXT_PUBLIC_SUPABASE_ANON_KEY=...
    SUPABASE_SERVICE_ROLE_KEY=...
    ```
+
+   `ALLOWED_TICKET_URL_HOSTS` é opcional (ver seção "Segurança" abaixo) — sem
+   ela, só `jira.xcl.digital` é aceito no link do ticket.
 
 3. Rode a migração `supabase/migrations/0001_init.sql` no SQL Editor do
    projeto Supabase (cria as tabelas `rooms`, `rounds`, `votes` e as
