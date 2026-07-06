@@ -8,7 +8,6 @@ export type CurrentRoundState = {
   roundNumber: number;
   status: RoundStatus;
   ticketCode: string;
-  ticketUrl: string | null;
   votes: RevealedVote[] | null;
   stats: VoteStats | null;
 };
@@ -24,7 +23,7 @@ export async function getCurrentRoundState(
 ): Promise<CurrentRoundState | null> {
   const { data: round } = await supabaseServer
     .from("rounds")
-    .select("id, round_number, status, ticket_code, ticket_url")
+    .select("id, round_number, status, ticket_code")
     .eq("room_id", roomId)
     .order("round_number", { ascending: false })
     .limit(1)
@@ -58,7 +57,6 @@ export async function getCurrentRoundState(
     roundNumber: round.round_number,
     status: round.status,
     ticketCode: round.ticket_code,
-    ticketUrl: round.ticket_url,
     votes,
     stats,
   };

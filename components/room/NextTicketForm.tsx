@@ -4,7 +4,6 @@ import { useState, type FormEvent } from "react";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
-import { Textarea } from "@/components/ui/textarea";
 
 export function NextTicketForm({
   submitting,
@@ -12,16 +11,10 @@ export function NextTicketForm({
   onCancel,
 }: {
   submitting: boolean;
-  onSubmit: (fields: {
-    ticketCode: string;
-    ticketUrl: string;
-    ticketDescription: string;
-  }) => void;
+  onSubmit: (fields: { ticketCode: string }) => void;
   onCancel: () => void;
 }) {
   const [ticketCode, setTicketCode] = useState("");
-  const [ticketUrl, setTicketUrl] = useState("");
-  const [ticketDescription, setTicketDescription] = useState("");
   const [error, setError] = useState<string | null>(null);
 
   function handleSubmit(event: FormEvent) {
@@ -31,7 +24,7 @@ export function NextTicketForm({
       return;
     }
     setError(null);
-    onSubmit({ ticketCode, ticketUrl, ticketDescription });
+    onSubmit({ ticketCode });
   }
 
   return (
@@ -47,30 +40,10 @@ export function NextTicketForm({
           id="nextTicketCode"
           required
           autoFocus
+          maxLength={15}
           value={ticketCode}
           onChange={(e) => setTicketCode(e.target.value)}
           placeholder="Ex.: PROJ-124"
-        />
-      </div>
-
-      <div className="grid gap-2">
-        <Label htmlFor="nextTicketUrl">Link do ticket (opcional)</Label>
-        <Input
-          id="nextTicketUrl"
-          type="url"
-          value={ticketUrl}
-          onChange={(e) => setTicketUrl(e.target.value)}
-          placeholder="https://jira.xcl.digital/browse/PROJ-124"
-        />
-      </div>
-
-      <div className="grid gap-2">
-        <Label htmlFor="nextTicketDescription">Descrição breve (opcional)</Label>
-        <Textarea
-          id="nextTicketDescription"
-          value={ticketDescription}
-          onChange={(e) => setTicketDescription(e.target.value)}
-          rows={2}
         />
       </div>
 

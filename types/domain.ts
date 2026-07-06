@@ -24,9 +24,6 @@ export type Round = {
   roomId: string;
   roundNumber: number;
   ticketCode: string;
-  ticketUrl: string | null;
-  ticketTitle: string;
-  ticketDescription: string | null;
   status: RoundStatus;
   createdAt: string;
   revealedAt: string | null;

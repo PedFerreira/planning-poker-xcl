@@ -100,6 +100,20 @@ O plano completo de arquitetura está em `C:\Users\pferr\.claude\plans\polished-
       ambiente) — o `Dockerfile` segue o padrão oficial de `output:
       'standalone'` do Next.js, mas só o build (`npm run build`) foi
       verificado, não o `docker build`/`docker run` em si.
+- [x] **Fase 6 — Redução de dados trafegados.** Após o app já estar em
+      produção (deploy na Vercel em 2026-07-06), removidos os campos de link
+      do ticket (Jira) e descrição da história — tanto do formulário de
+      criação de sala/próximo ticket quanto da API e do schema do banco
+      (`supabase/migrations/0002_remove_ticket_url_description.sql`, que
+      também remove `ticket_title`, coluna que desde a Fase 1 só espelhava
+      `ticket_code` em todo insert e nunca era lida de volta). O campo
+      "Ticket do Jira" (`ticketCode`) passou de 60 para 15 caracteres. Isso
+      torna moot a mitigação de XSS via link do ticket descrita abaixo em
+      "Corrigido nesta revisão" — o vetor deixou de existir porque o campo
+      não existe mais, não porque a validação melhorou.
+      **Ação pendente:** rodar `supabase/migrations/0002_remove_ticket_url_description.sql`
+      no SQL Editor do projeto Supabase de produção — `drop column` é
+      destrutivo, sem rollback automático.
 
 ## Segurança
 
@@ -114,10 +128,11 @@ ameaça específico deste app).
   que aceita qualquer esquema — inclusive `javascript:` — e era renderizado
   direto como `<a href>` em `RoomHeader`. Como qualquer pessoa cria uma sala
   sem login, isso era um vetor de XSS/roubo do token de Scrum Master
-  explorável por qualquer um. Corrigido em duas camadas: validação em
-  `types/api.ts` (só `https` + allowlist de host, configurável via
-  `ALLOWED_TICKET_URL_HOSTS` no `.env`) e um guard de defesa em profundidade em
-  `RoomHeader.tsx` que só renderiza o link se o esquema for `http(s)`.
+  explorável por qualquer um. Corrigido nesta revisão em duas camadas
+  (validação `https` + allowlist de host, e um guard de defesa em
+  profundidade em `RoomHeader.tsx`); na Fase 6 o campo foi removido do app
+  por completo (ver "Status do projeto" acima), então hoje o vetor nem
+  existe mais.
 - **Content-Security-Policy e headers de segurança.** Adicionados em
   `next.config.ts`: CSP (restringe scripts/estilos/conexões a `'self'` + host
   do Supabase), `X-Frame-Options: DENY` / `frame-ancestors 'none'`
@@ -163,8 +178,10 @@ possíveis no projeto Supabase, fora do escopo do código:
 - **Limpeza automática de salas antigas.** Já é um risco em aberto anotado
   no plano original (ver "Status do projeto" acima) — configurar `pg_cron` no
   Postgres do Supabase (ou Vercel Cron, se for esse o host) pra apagar salas
-  com `last_activity_at` > 7 dias reduz a superfície de dados (código/URL de
-  ticket, nomes) retidos indefinidamente.
+  com `last_activity_at` > 1 hora de inatividade reduz a superfície de dados
+  (código do ticket, nomes) retidos indefinidamente. Complementar a isso, o
+  Scrum Master também deve poder encerrar a sala manualmente ao fim da
+  sessão — nenhum dos dois está implementado ainda.
 - **Network Restrictions** (disponível em planos pagos do Supabase): restringe
   o acesso ao Postgres por IP — relevante se o app for hospedado com IP fixo
   (ex.: atrás de um proxy corporativo).
@@ -193,12 +210,13 @@ produção num subdomínio corporativo, vale confirmar com o time de segurança:
   trocar de hosting, remover o registro DNS (CNAME) do subdomínio — um
   registro "órfão" ainda apontando pra um provedor (Vercel, etc.) é um vetor
   clássico de takeover de subdomínio.
-- **Link do ticket como vetor de phishing interno.** Mesmo com o allowlist de
-  host implementado, o app permite a qualquer pessoa sem login criar uma sala
-  e compartilhar o link — hospedado num domínio da empresa, isso aumenta a
-  credibilidade percebida por quem recebe. Vale considerar se algum controle
-  adicional (ex.: SSO na criação de sala) faz sentido dependendo de como o
-  link será divulgado internamente.
+- **Sala compartilhável sem login como vetor de phishing interno.** O app
+  permite a qualquer pessoa sem login criar uma sala e compartilhar o link —
+  hospedado num domínio da empresa, isso aumenta a credibilidade percebida
+  por quem recebe. Vale considerar se algum controle adicional (ex.: SSO na
+  criação de sala) faz sentido dependendo de como o link será divulgado
+  internamente. (O sub-ponto específico de link do ticket do Jira, citado
+  aqui antes, não existe mais — ver Fase 6 em "Status do projeto".)
 
 ## Rodando localmente
 
@@ -217,12 +235,11 @@ produção num subdomínio corporativo, vale confirmar com o time de segurança:
    SUPABASE_SERVICE_ROLE_KEY=...
    ```
 
-   `ALLOWED_TICKET_URL_HOSTS` é opcional (ver seção "Segurança" abaixo) — sem
-   ela, só `jira.xcl.digital` é aceito no link do ticket.
-
-3. Rode a migração `supabase/migrations/0001_init.sql` no SQL Editor do
-   projeto Supabase (cria as tabelas `rooms`, `rounds`, `votes` e as
-   policies de RLS).
+3. Rode as migrações, em ordem, no SQL Editor do projeto Supabase:
+   `supabase/migrations/0001_init.sql` (cria as tabelas `rooms`, `rounds`,
+   `votes` e as policies de RLS) e
+   `supabase/migrations/0002_remove_ticket_url_description.sql` (remove os
+   campos de link/descrição do ticket).
 
 4. Suba o servidor de desenvolvimento:
 

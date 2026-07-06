@@ -9,47 +9,11 @@ import {
 
 const deckKeys = DECK_LIST.map((deck) => deck.key) as [string, ...string[]];
 
-// z.string().url() só valida sintaxe — aceita qualquer esquema, incluindo
-// "javascript:", que o RoomHeader renderiza como <a href> clicável pra todo
-// participante da sala. Restringe a https e a um allowlist de host, evitando
-// que a sala vire vetor de XSS/phishing pra quem clicar no link do ticket.
-const DEFAULT_ALLOWED_TICKET_URL_HOSTS = ["jira.xcl.digital"];
-
-function getAllowedTicketUrlHosts(): string[] {
-  const fromEnv = process.env.ALLOWED_TICKET_URL_HOSTS;
-  if (!fromEnv) return DEFAULT_ALLOWED_TICKET_URL_HOSTS;
-  return fromEnv
-    .split(",")
-    .map((host) => host.trim().toLowerCase())
-    .filter(Boolean);
-}
-
-function isAllowedTicketUrl(value: string): boolean {
-  try {
-    const url = new URL(value);
-    return url.protocol === "https:" && getAllowedTicketUrlHosts().includes(url.hostname.toLowerCase());
-  } catch {
-    return false;
-  }
-}
-
-const TicketUrlSchema = z
-  .string()
-  .trim()
-  .max(500)
-  .refine(isAllowedTicketUrl, {
-    message: "URL do ticket precisa ser https e de um domínio permitido (ver ALLOWED_TICKET_URL_HOSTS)",
-  })
-  .optional()
-  .or(z.literal(""));
-
 export const CreateRoomRequestSchema = z.object({
   projectName: z.string().trim().min(1).max(120),
   scrumMasterName: z.string().trim().min(1).max(60),
   deckType: z.enum(deckKeys),
-  ticketCode: z.string().trim().min(1).max(60),
-  ticketUrl: TicketUrlSchema,
-  ticketDescription: z.string().trim().max(2000).optional().or(z.literal("")),
+  ticketCode: z.string().trim().min(1).max(15),
 });
 export type CreateRoomRequest = z.infer<typeof CreateRoomRequestSchema>;
 
@@ -88,9 +52,7 @@ export const CreateRoundRequestSchema = z.discriminatedUnion("mode", [
   z.object({ mode: z.literal("revote") }),
   z.object({
     mode: z.literal("next"),
-    ticketCode: z.string().trim().min(1).max(60),
-    ticketUrl: TicketUrlSchema,
-    ticketDescription: z.string().trim().max(2000).optional().or(z.literal("")),
+    ticketCode: z.string().trim().min(1).max(15),
   }),
 ]);
 export type CreateRoundRequest = z.infer<typeof CreateRoundRequestSchema>;
@@ -104,7 +66,6 @@ export const RoundHistoryEntrySchema = z.object({
   id: z.string().uuid(),
   roundNumber: z.number().int().positive(),
   ticketCode: z.string(),
-  ticketUrl: z.string().url().nullable(),
   revealedAt: z.string().datetime(),
   stats: VoteStatsSchema,
 });
@@ -119,7 +80,6 @@ export const CurrentRoundResponseSchema = z.object({
   id: z.string().uuid(),
   status: z.enum(["voting", "revealed"]),
   ticketCode: z.string(),
-  ticketUrl: z.string().url().nullable(),
   votes: z.array(RevealedVoteSchema).nullable(),
   stats: VoteStatsSchema.nullable(),
 });

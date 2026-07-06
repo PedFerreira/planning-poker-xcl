@@ -46,7 +46,6 @@ export default async function RoomPage({
           deckName={deck?.name ?? room.deck_type}
           deckType={room.deck_type}
           ticketCode={round.ticketCode}
-          ticketUrl={round.ticketUrl}
           initialRound={{
             id: round.id,
             status: round.status,

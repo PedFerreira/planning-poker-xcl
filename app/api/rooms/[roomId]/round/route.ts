@@ -28,7 +28,6 @@ export async function GET(
     id: round.id,
     status: round.status,
     ticketCode: round.ticketCode,
-    ticketUrl: round.ticketUrl,
     votes: round.votes,
     stats: round.stats,
   };

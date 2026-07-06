@@ -39,7 +39,6 @@ export function RoomClient({
   deckName,
   deckType,
   ticketCode,
-  ticketUrl,
   initialRound,
 }: {
   roomId: string;
@@ -48,7 +47,6 @@ export function RoomClient({
   deckName: string;
   deckType: string;
   ticketCode: string;
-  ticketUrl: string | null;
   initialRound: RoundState;
 }) {
   const identity = useIdentityStore((state) => state.identity);
@@ -56,7 +54,7 @@ export function RoomClient({
   const hydrate = useIdentityStore((state) => state.hydrate);
 
   const [round, setRound] = useState<RoundState>(initialRound);
-  const [ticket, setTicket] = useState({ code: ticketCode, url: ticketUrl });
+  const [currentTicketCode, setCurrentTicketCode] = useState(ticketCode);
   const [history, setHistory] = useState<RoundHistoryEntry[]>([]);
   const [selectedCard, setSelectedCard] = useState<string | null>(() => {
     if (typeof window === "undefined" || initialRound.status !== "voting") return null;
@@ -101,7 +99,7 @@ export function RoomClient({
 
   function applyNewRound(newRound: RoundPublic) {
     setRound({ id: newRound.id, status: newRound.status, votes: null, stats: null });
-    setTicket({ code: newRound.ticketCode, url: newRound.ticketUrl });
+    setCurrentTicketCode(newRound.ticketCode);
     setSelectedCard(null);
     clearOwnVote(roomId);
     void setHasVoted(false);
@@ -126,7 +124,7 @@ export function RoomClient({
 
       const isNewRound = data.id !== round.id;
       setRound({ id: data.id, status: data.status, votes: data.votes, stats: data.stats });
-      setTicket({ code: data.ticketCode, url: data.ticketUrl });
+      setCurrentTicketCode(data.ticketCode);
 
       if (isNewRound) {
         setSelectedCard(null);
@@ -236,16 +234,12 @@ export function RoomClient({
     await startRound({ mode: "revote" });
   }
 
-  async function handleNextTicket(fields: {
-    ticketCode: string;
-    ticketUrl: string;
-    ticketDescription: string;
-  }) {
+  async function handleNextTicket(fields: { ticketCode: string }) {
     await startRound({ mode: "next", ...fields });
   }
 
   async function startRound(
-    body: { mode: "revote" } | { mode: "next"; ticketCode: string; ticketUrl: string; ticketDescription: string }
+    body: { mode: "revote" } | { mode: "next"; ticketCode: string }
   ) {
     const smToken = getSmToken(roomId);
     if (!smToken || startingRound) return;
@@ -286,8 +280,7 @@ export function RoomClient({
         projectName={projectName}
         scrumMasterName={scrumMasterName}
         deckName={deckName}
-        ticketCode={ticket.code}
-        ticketUrl={ticket.url}
+        ticketCode={currentTicketCode}
       />
 
       {isScrumMaster && !revealed && (

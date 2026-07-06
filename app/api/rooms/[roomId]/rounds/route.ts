@@ -27,7 +27,7 @@ export async function POST(
 
   const { data: currentRound } = await supabaseServer
     .from("rounds")
-    .select("round_number, status, ticket_code, ticket_url, ticket_title, ticket_description")
+    .select("round_number, status, ticket_code")
     .eq("room_id", roomId)
     .order("round_number", { ascending: false })
     .limit(1)
@@ -45,18 +45,8 @@ export async function POST(
 
   const insert =
     parsed.data.mode === "revote"
-      ? {
-          ticket_code: currentRound.ticket_code,
-          ticket_url: currentRound.ticket_url,
-          ticket_title: currentRound.ticket_title,
-          ticket_description: currentRound.ticket_description,
-        }
-      : {
-          ticket_code: parsed.data.ticketCode,
-          ticket_url: parsed.data.ticketUrl || null,
-          ticket_title: parsed.data.ticketCode,
-          ticket_description: parsed.data.ticketDescription || null,
-        };
+      ? { ticket_code: currentRound.ticket_code }
+      : { ticket_code: parsed.data.ticketCode };
 
   const { data: newRound, error } = await supabaseServer
     .from("rounds")
@@ -65,7 +55,7 @@ export async function POST(
       round_number: currentRound.round_number + 1,
       ...insert,
     })
-    .select("id, room_id, round_number, ticket_code, ticket_url, ticket_title, ticket_description, status, created_at, revealed_at")
+    .select("id, room_id, round_number, ticket_code, status, created_at, revealed_at")
     .single();
 
   if (error || !newRound) {
@@ -77,9 +67,6 @@ export async function POST(
     roomId: newRound.room_id,
     roundNumber: newRound.round_number,
     ticketCode: newRound.ticket_code,
-    ticketUrl: newRound.ticket_url,
-    ticketTitle: newRound.ticket_title,
-    ticketDescription: newRound.ticket_description,
     status: newRound.status,
     // Supabase retorna timestamptz como "...+00:00"; RoundPublicSchema exige
     // o formato "...Z" (z.string().datetime() sem offset), senão o parse

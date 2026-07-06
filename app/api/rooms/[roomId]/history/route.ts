@@ -21,7 +21,7 @@ export async function GET(
 
   const { data: rounds } = await supabaseServer
     .from("rounds")
-    .select("id, round_number, ticket_code, ticket_url, revealed_at")
+    .select("id, round_number, ticket_code, revealed_at")
     .eq("room_id", roomId)
     .eq("status", "revealed")
     .order("round_number", { ascending: false });
@@ -42,7 +42,6 @@ export async function GET(
         id: round.id,
         roundNumber: round.round_number,
         ticketCode: round.ticket_code,
-        ticketUrl: round.ticket_url,
         revealedAt: new Date(round.revealed_at as string).toISOString(),
         stats,
       };

@@ -6,7 +6,6 @@ import { DECK_LIST } from "@/config/decks";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
-import { Textarea } from "@/components/ui/textarea";
 import {
   Select,
   SelectContent,
@@ -22,8 +21,6 @@ export function CreateRoomForm() {
   const [scrumMasterName, setScrumMasterName] = useState("");
   const [deckType, setDeckType] = useState(DECK_LIST[0].key);
   const [ticketCode, setTicketCode] = useState("");
-  const [ticketUrl, setTicketUrl] = useState("");
-  const [ticketDescription, setTicketDescription] = useState("");
   const [error, setError] = useState<string | null>(null);
   const [submitting, setSubmitting] = useState(false);
 
@@ -41,8 +38,6 @@ export function CreateRoomForm() {
           scrumMasterName,
           deckType,
           ticketCode,
-          ticketUrl,
-          ticketDescription,
         }),
       });
 
@@ -110,30 +105,10 @@ export function CreateRoomForm() {
         <Input
           id="ticketCode"
           required
+          maxLength={15}
           value={ticketCode}
           onChange={(e) => setTicketCode(e.target.value)}
           placeholder="Ex.: PROJ-123"
-        />
-      </div>
-
-      <div className="grid gap-2">
-        <Label htmlFor="ticketUrl">Link do ticket (opcional)</Label>
-        <Input
-          id="ticketUrl"
-          type="url"
-          value={ticketUrl}
-          onChange={(e) => setTicketUrl(e.target.value)}
-          placeholder="https://jira.xcl.digital/browse/PROJ-123"
-        />
-      </div>
-
-      <div className="grid gap-2">
-        <Label htmlFor="ticketDescription">Descrição breve da história</Label>
-        <Textarea
-          id="ticketDescription"
-          value={ticketDescription}
-          onChange={(e) => setTicketDescription(e.target.value)}
-          rows={3}
         />
       </div>
 

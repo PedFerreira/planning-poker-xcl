@@ -13,8 +13,7 @@ export async function POST(request: Request) {
     );
   }
 
-  const { projectName, scrumMasterName, deckType, ticketCode, ticketUrl, ticketDescription } =
-    parsed.data;
+  const { projectName, scrumMasterName, deckType, ticketCode } = parsed.data;
 
   const roomId = generateRoomId();
   const scrumMasterToken = generateScrumMasterToken();
@@ -38,9 +37,6 @@ export async function POST(request: Request) {
     room_id: roomId,
     round_number: 1,
     ticket_code: ticketCode,
-    ticket_url: ticketUrl || null,
-    ticket_title: ticketCode,
-    ticket_description: ticketDescription || null,
   });
 
   if (roundError) {
