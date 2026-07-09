@@ -1,6 +1,7 @@
 import { NextResponse } from "next/server";
-import { supabaseServer } from "@/lib/supabase/server";
-import type { Room } from "@/types/domain";
+import { getRoomById } from "@/lib/rooms";
+import { verifySmToken } from "@/lib/sm-auth";
+import { closeRoom } from "@/lib/purge";
 
 export async function GET(
   _request: Request,
@@ -8,26 +9,25 @@ export async function GET(
 ) {
   const { roomId } = await params;
 
-  const { data, error } = await supabaseServer
-    .from("rooms")
-    .select("id, project_name, scrum_master_name, deck_type, created_at")
-    .eq("id", roomId)
-    .maybeSingle();
-
-  if (error) {
-    return NextResponse.json({ error: "Erro ao buscar a sala" }, { status: 500 });
-  }
-  if (!data) {
+  const room = await getRoomById(roomId);
+  if (!room) {
     return NextResponse.json({ error: "Sala não encontrada" }, { status: 404 });
   }
 
-  const room: Room = {
-    id: data.id,
-    projectName: data.project_name,
-    scrumMasterName: data.scrum_master_name,
-    deckType: data.deck_type,
-    createdAt: data.created_at,
-  };
-
   return NextResponse.json(room);
+}
+
+export async function DELETE(
+  request: Request,
+  { params }: { params: Promise<{ roomId: string }> }
+) {
+  const { roomId } = await params;
+
+  const authorized = await verifySmToken(roomId, request.headers.get("x-sm-token"));
+  if (!authorized) {
+    return NextResponse.json({ error: "Não autorizado" }, { status: 403 });
+  }
+
+  await closeRoom(roomId, "manual");
+  return NextResponse.json({ ok: true });
 }

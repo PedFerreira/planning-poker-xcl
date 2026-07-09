@@ -1,10 +1,14 @@
 "use client";
 
-import { useEffect, useState } from "react";
+import { useEffect, useRef, useState } from "react";
+import { useRouter } from "next/navigation";
 import { getStoredIdentity, storeIdentity } from "@/lib/identity";
 import { getSmToken } from "@/lib/sm-token";
 import { generateParticipantId } from "@/lib/ids";
 import { getOwnVote, storeOwnVote, clearOwnVote } from "@/lib/vote-storage";
+import { getLastKnownRound } from "@/lib/round-cache";
+import { deriveRevealedVotes, deriveVoteStats } from "@/lib/round-gossip";
+import { isValidCardValue } from "@/config/decks";
 import { useIdentityStore } from "@/store/useIdentityStore";
 import { useRoomChannel } from "@/lib/realtime/use-room-channel";
 import { JoinForm } from "@/components/room/JoinForm";
@@ -12,25 +16,14 @@ import { RoomHeader } from "@/components/room/RoomHeader";
 import { VotingTable } from "@/components/room/VotingTable";
 import { DeckFooter } from "@/components/room/DeckFooter";
 import { ResultsPanel } from "@/components/room/ResultsPanel";
-import { RoundHistory } from "@/components/room/RoundHistory";
 import { NextTicketForm } from "@/components/room/NextTicketForm";
 import { ConnectionBanner } from "@/components/room/ConnectionBanner";
+import { CloseRoomButton } from "@/components/room/CloseRoomButton";
 import { Button } from "@/components/ui/button";
-import type { RoundStatus, RevealedVote, VoteStats } from "@/types/domain";
-import type { RealtimeEvent, RoundPublic } from "@/types/realtime";
-import type {
-  RevealResponse,
-  CreateRoundResponse,
-  RoundHistoryEntry,
-  CurrentRoundResponse,
-} from "@/types/api";
+import type { CreateRoundResponse } from "@/types/api";
+import type { RoundMirror } from "@/types/realtime";
 
-type RoundState = {
-  id: string;
-  status: RoundStatus;
-  votes: RevealedVote[] | null;
-  stats: VoteStats | null;
-};
+const HEARTBEAT_INTERVAL_MS = 5 * 60 * 1000;
 
 export function RoomClient({
   roomId,
@@ -38,33 +31,29 @@ export function RoomClient({
   scrumMasterName,
   deckName,
   deckType,
-  ticketCode,
-  initialRound,
 }: {
   roomId: string;
   projectName: string;
   scrumMasterName: string;
   deckName: string;
   deckType: string;
-  ticketCode: string;
-  initialRound: RoundState;
 }) {
+  const router = useRouter();
   const identity = useIdentityStore((state) => state.identity);
   const hydrated = useIdentityStore((state) => state.hydrated);
   const hydrate = useIdentityStore((state) => state.hydrate);
 
-  const [round, setRound] = useState<RoundState>(initialRound);
-  const [currentTicketCode, setCurrentTicketCode] = useState(ticketCode);
-  const [history, setHistory] = useState<RoundHistoryEntry[]>([]);
-  const [selectedCard, setSelectedCard] = useState<string | null>(() => {
-    if (typeof window === "undefined" || initialRound.status !== "voting") return null;
-    const stored = getOwnVote(roomId);
-    return stored && stored.roundId === initialRound.id ? stored.cardValue : null;
-  });
+  const [selectedCard, setSelectedCard] = useState<string | null>(null);
+  const [syncedRoundId, setSyncedRoundId] = useState<string | null>(null);
   const [revealing, setRevealing] = useState(false);
   const [startingRound, setStartingRound] = useState(false);
   const [showNextTicketForm, setShowNextTicketForm] = useState(false);
   const [voteError, setVoteError] = useState<string | null>(null);
+  const [closedMessage, setClosedMessage] = useState<string | null>(null);
+  const revealedRoundIdRef = useRef<string | null>(null);
+  const [initialRound] = useState<RoundMirror | null>(() =>
+    typeof window === "undefined" ? null : getLastKnownRound(roomId)
+  );
 
   useEffect(() => {
     const stored = getStoredIdentity(roomId);
@@ -90,148 +79,90 @@ export function RoomClient({
     hydrate(null);
   }, [roomId, hydrate, scrumMasterName]);
 
-  const { participants, setHasVoted, connectionStatus } = useRoomChannel(
-    roomId,
-    identity,
-    handleRealtimeEvent,
-    resyncRound
-  );
-
-  function applyNewRound(newRound: RoundPublic) {
-    setRound({ id: newRound.id, status: newRound.status, votes: null, stats: null });
-    setCurrentTicketCode(newRound.ticketCode);
-    setSelectedCard(null);
-    clearOwnVote(roomId);
-    void setHasVoted(false);
+  function handleRoomClosed(reason: "inactivity" | "manual") {
+    setClosedMessage(
+      reason === "manual"
+        ? "O Scrum Master encerrou esta sala."
+        : "Esta sala foi encerrada por inatividade."
+    );
+    setTimeout(() => router.push("/"), 3000);
   }
 
-  function handleRealtimeEvent(event: RealtimeEvent) {
-    if (event.type === "cards_revealed" && event.roundId === round.id) {
-      setRound((prev) => ({ ...prev, status: "revealed", votes: event.votes, stats: event.stats }));
-    }
-    if (event.type === "round_started") {
-      applyNewRound(event.round);
-    }
+  const { participants, round, connectionStatus, castVote, retractVote, revealOwnVote } =
+    useRoomChannel(roomId, identity, initialRound, handleRoomClosed);
+
+  // Restaura a seleção da própria carta (guardada localmente, nunca no
+  // servidor) sempre que a rodada em votação muda — ajuste de estado durante
+  // a renderização (não em efeito) seguindo o padrão do React pra "resetar
+  // estado quando uma prop muda", evitando um commit extra em cascata.
+  if (round && round.status === "voting" && round.id !== syncedRoundId) {
+    setSyncedRoundId(round.id);
+    const stored = getOwnVote(roomId);
+    setSelectedCard(stored && stored.roundId === round.id ? stored.cardValue : null);
   }
 
-  // Postgres é a fonte de verdade: ao reconectar após ficar offline, refaz
-  // a leitura do estado atual pra cobrir qualquer broadcast perdido.
-  async function resyncRound() {
-    try {
-      const res = await fetch(`/api/rooms/${roomId}/round`);
-      if (!res.ok) return;
-      const data = (await res.json()) as CurrentRoundResponse;
-
-      const isNewRound = data.id !== round.id;
-      setRound({ id: data.id, status: data.status, votes: data.votes, stats: data.stats });
-      setCurrentTicketCode(data.ticketCode);
-
-      if (isNewRound) {
-        setSelectedCard(null);
-        clearOwnVote(roomId);
-        void setHasVoted(false);
-      }
-    } catch {
-      // sem sorte agora; a próxima reconexão tenta de novo
-    }
-  }
-
-  // hasVoted é autoritativo só via GET /vote-status; reconcilia a presence
-  // ao entrar (cobre o caso de sessionStorage limpo em outro dispositivo).
+  // Ao ver a própria rodada virar "revealed", revela o valor guardado
+  // localmente (se houver) na própria presence — o servidor nunca teve
+  // esse valor, só este client.
   useEffect(() => {
-    if (!identity || round.status !== "voting") return;
-    let cancelled = false;
+    if (!round || round.status !== "revealed") return;
+    if (revealedRoundIdRef.current === round.id) return;
+    revealedRoundIdRef.current = round.id;
 
-    fetch(`/api/rounds/${round.id}/vote-status?participantId=${identity.participantId}`)
-      .then((res) => (res.ok ? res.json() : null))
-      .then((data: { hasVoted: boolean } | null) => {
-        if (!cancelled && data) {
-          setHasVoted(data.hasVoted);
-        }
-      })
-      .catch(() => {});
-
-    return () => {
-      cancelled = true;
-    };
+    const stored = getOwnVote(roomId);
+    if (stored && stored.roundId === round.id) {
+      void revealOwnVote(stored.cardValue);
+    }
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [roomId, identity?.participantId, round.id, round.status]);
+  }, [roomId, round?.id, round?.status, revealOwnVote]);
 
-  // Histórico inclui a rodada assim que ela é revelada e sempre que uma nova
-  // rodada começa (a anterior passa a fazer parte do histórico).
+  // Sinal de atividade: sem writes em votes/rounds, isto é o que mantém
+  // rooms.last_activity_at vivo enquanto a sala está em uso.
   useEffect(() => {
-    let cancelled = false;
-    fetch(`/api/rooms/${roomId}/history`)
-      .then((res) => (res.ok ? res.json() : null))
-      .then((data: { rounds: RoundHistoryEntry[] } | null) => {
-        if (!cancelled && data) {
-          setHistory(data.rounds);
-        }
-      })
-      .catch(() => {});
-    return () => {
-      cancelled = true;
-    };
-  }, [roomId, round.id, round.status]);
+    function ping() {
+      void fetch(`/api/rooms/${roomId}/heartbeat`, { method: "POST" });
+    }
+    ping();
+    const interval = setInterval(ping, HEARTBEAT_INTERVAL_MS);
+    return () => clearInterval(interval);
+  }, [roomId]);
 
   async function handleSelectCard(cardValue: string) {
-    if (!identity || round.status !== "voting") return;
+    if (!identity || !round || round.status !== "voting") return;
+    if (!isValidCardValue(deckType, cardValue)) return;
     setVoteError(null);
 
     const isRetracting = selectedCard === cardValue;
 
-    try {
-      if (isRetracting) {
-        const res = await fetch(`/api/rounds/${round.id}/votes`, {
-          method: "DELETE",
-          headers: { "Content-Type": "application/json" },
-          body: JSON.stringify({ participantId: identity.participantId }),
-        });
-        if (!res.ok) throw new Error();
-        clearOwnVote(roomId);
-        setSelectedCard(null);
-        await setHasVoted(false);
-      } else {
-        const res = await fetch(`/api/rounds/${round.id}/votes`, {
-          method: "POST",
-          headers: { "Content-Type": "application/json" },
-          body: JSON.stringify({
-            participantId: identity.participantId,
-            participantName: identity.name,
-            participantRole: identity.role,
-            cardValue,
-          }),
-        });
-        if (!res.ok) throw new Error();
-        storeOwnVote(roomId, { roundId: round.id, cardValue });
-        setSelectedCard(cardValue);
-        await setHasVoted(true);
-      }
-    } catch {
-      setVoteError("Não foi possível registrar seu voto. Tente novamente.");
+    if (isRetracting) {
+      clearOwnVote(roomId);
+      setSelectedCard(null);
+      await retractVote();
+    } else {
+      storeOwnVote(roomId, { roundId: round.id, cardValue });
+      setSelectedCard(cardValue);
+      await castVote();
     }
   }
 
   async function handleReveal() {
     const smToken = getSmToken(roomId);
-    if (!smToken || revealing) return;
+    if (!smToken || !round || revealing) return;
     setRevealing(true);
     try {
-      const res = await fetch(`/api/rounds/${round.id}/reveal`, {
+      await fetch(`/api/rooms/${roomId}/reveal`, {
         method: "POST",
-        headers: { "x-sm-token": smToken },
+        headers: { "Content-Type": "application/json", "x-sm-token": smToken },
+        body: JSON.stringify({ roundId: round.id }),
       });
-      if (res.ok) {
-        const data = (await res.json()) as RevealResponse;
-        setRound((prev) => ({ ...prev, status: "revealed", votes: data.votes, stats: data.stats }));
-      }
     } finally {
       setRevealing(false);
     }
   }
 
   async function handleRevote() {
-    await startRound({ mode: "revote" });
+    if (!round) return;
+    await startRound({ mode: "revote", ticketCode: round.ticketCode });
   }
 
   async function handleNextTicket(fields: { ticketCode: string }) {
@@ -239,7 +170,7 @@ export function RoomClient({
   }
 
   async function startRound(
-    body: { mode: "revote" } | { mode: "next"; ticketCode: string }
+    body: { mode: "revote"; ticketCode: string } | { mode: "next"; ticketCode: string }
   ) {
     const smToken = getSmToken(roomId);
     if (!smToken || startingRound) return;
@@ -251,8 +182,9 @@ export function RoomClient({
         body: JSON.stringify(body),
       });
       if (res.ok) {
-        const data = (await res.json()) as CreateRoundResponse;
-        applyNewRound(data.round);
+        (await res.json()) as CreateRoundResponse;
+        clearOwnVote(roomId);
+        setSelectedCard(null);
         setShowNextTicketForm(false);
       }
     } finally {
@@ -264,11 +196,30 @@ export function RoomClient({
     return null;
   }
 
+  if (closedMessage) {
+    return (
+      <div className="flex flex-col items-center gap-2 text-center">
+        <p className="text-lg font-semibold">{closedMessage}</p>
+        <p className="text-sm text-muted-foreground">Voltando para o início…</p>
+      </div>
+    );
+  }
+
   if (!identity) {
     return <JoinForm roomId={roomId} />;
   }
 
+  if (!round) {
+    return (
+      <p className="text-sm text-muted-foreground">
+        Sincronizando com a sala…
+      </p>
+    );
+  }
+
   const revealed = round.status === "revealed";
+  const revealedVotes = revealed ? deriveRevealedVotes(participants, round.id) : null;
+  const stats = revealedVotes ? deriveVoteStats(deckType, revealedVotes) : null;
   const canVote = identity.role !== "Observador";
   const isScrumMaster = Boolean(getSmToken(roomId));
 
@@ -280,25 +231,27 @@ export function RoomClient({
         projectName={projectName}
         scrumMasterName={scrumMasterName}
         deckName={deckName}
-        ticketCode={currentTicketCode}
+        ticketCode={round.ticketCode}
       />
 
-      {isScrumMaster && !revealed && (
-        <div className="flex justify-end">
-          <Button type="button" onClick={handleReveal} disabled={revealing}>
-            {revealing ? "Revelando…" : "Revelar cartas"}
-          </Button>
-        </div>
-      )}
-
-      {isScrumMaster && revealed && !showNextTicketForm && (
-        <div className="flex justify-end gap-2">
-          <Button type="button" variant="outline" onClick={handleRevote} disabled={startingRound}>
-            {startingRound ? "Criando…" : "Nova rodada"}
-          </Button>
-          <Button type="button" onClick={() => setShowNextTicketForm(true)} disabled={startingRound}>
-            Próximo ticket
-          </Button>
+      {isScrumMaster && (
+        <div className="flex flex-wrap items-center justify-end gap-2">
+          {!revealed && (
+            <Button type="button" onClick={handleReveal} disabled={revealing}>
+              {revealing ? "Revelando…" : "Revelar cartas"}
+            </Button>
+          )}
+          {revealed && !showNextTicketForm && (
+            <>
+              <Button type="button" variant="outline" onClick={handleRevote} disabled={startingRound}>
+                {startingRound ? "Criando…" : "Nova rodada"}
+              </Button>
+              <Button type="button" onClick={() => setShowNextTicketForm(true)} disabled={startingRound}>
+                Próximo ticket
+              </Button>
+            </>
+          )}
+          <CloseRoomButton roomId={roomId} />
         </div>
       )}
 
@@ -317,10 +270,10 @@ export function RoomClient({
         selfId={identity.participantId}
         deckType={deckType}
         revealed={revealed}
-        revealedVotes={round.votes}
+        revealedVotes={revealedVotes}
       />
 
-      {revealed && round.stats && <ResultsPanel deckType={deckType} stats={round.stats} />}
+      {revealed && stats && <ResultsPanel deckType={deckType} stats={stats} />}
 
       {!revealed && canVote && (
         <DeckFooter
@@ -336,8 +289,6 @@ export function RoomClient({
           Observadores acompanham a rodada sem votar.
         </p>
       )}
-
-      <RoundHistory deckType={deckType} rounds={history} />
     </div>
   );
 }

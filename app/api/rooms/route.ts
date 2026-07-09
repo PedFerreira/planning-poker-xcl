@@ -1,7 +1,9 @@
+import { randomUUID } from "node:crypto";
 import { NextResponse } from "next/server";
-import { supabaseServer } from "@/lib/supabase/server";
+import { createRoom } from "@/lib/rooms";
 import { generateRoomId, generateScrumMasterToken } from "@/lib/ids";
 import { CreateRoomRequestSchema, type CreateRoomResponse } from "@/types/api";
+import type { RoundMirror } from "@/types/realtime";
 
 export async function POST(request: Request) {
   const body = await request.json().catch(() => null);
@@ -18,35 +20,33 @@ export async function POST(request: Request) {
   const roomId = generateRoomId();
   const scrumMasterToken = generateScrumMasterToken();
 
-  const { error: roomError } = await supabaseServer.from("rooms").insert({
+  const created = await createRoom({
     id: roomId,
-    project_name: projectName,
-    scrum_master_name: scrumMasterName,
-    deck_type: deckType,
-    scrum_master_token: scrumMasterToken,
+    projectName,
+    scrumMasterName,
+    deckType,
+    scrumMasterToken,
   });
 
-  if (roomError) {
+  if (!created) {
     return NextResponse.json(
       { error: "Não foi possível criar a sala" },
       { status: 500 }
     );
   }
 
-  const { error: roundError } = await supabaseServer.from("rounds").insert({
-    room_id: roomId,
-    round_number: 1,
-    ticket_code: ticketCode,
-  });
+  // Rodada 1 nunca é gravada em banco nem transmitida por broadcast (o SM
+  // ainda nem abriu o canal Realtime neste momento — perderia o evento).
+  // Vai só na resposta; o client guarda em lib/round-cache.ts e usa pra
+  // inicializar o estado local ao entrar na sala.
+  const round: RoundMirror = {
+    id: randomUUID(),
+    ticketCode,
+    status: "voting",
+    createdAt: new Date().toISOString(),
+    revealedAt: null,
+  };
 
-  if (roundError) {
-    await supabaseServer.from("rooms").delete().eq("id", roomId);
-    return NextResponse.json(
-      { error: "Não foi possível criar a primeira rodada" },
-      { status: 500 }
-    );
-  }
-
-  const response: CreateRoomResponse = { roomId, scrumMasterToken };
+  const response: CreateRoomResponse = { roomId, scrumMasterToken, round };
   return NextResponse.json(response, { status: 201 });
 }

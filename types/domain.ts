@@ -21,8 +21,6 @@ export type Room = {
 
 export type Round = {
   id: string;
-  roomId: string;
-  roundNumber: number;
   ticketCode: string;
   status: RoundStatus;
   createdAt: string;

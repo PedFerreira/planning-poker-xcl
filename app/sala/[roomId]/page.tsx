@@ -1,8 +1,7 @@
 import { Suspense } from "react";
 import { notFound } from "next/navigation";
-import { supabaseServer } from "@/lib/supabase/server";
+import { getRoomById } from "@/lib/rooms";
 import { getDeck } from "@/config/decks";
-import { getCurrentRoundState } from "@/lib/room-state";
 import { ScrumMasterTokenCapture } from "@/components/room/ScrumMasterTokenCapture";
 import { RoomClient } from "@/components/room/RoomClient";
 import { Header } from "@/components/layout/Header";
@@ -14,23 +13,16 @@ export default async function RoomPage({
 }) {
   const { roomId } = await params;
 
-  const { data: room } = await supabaseServer
-    .from("rooms")
-    .select("id, project_name, scrum_master_name, deck_type")
-    .eq("id", roomId)
-    .maybeSingle();
-
+  const room = await getRoomById(roomId);
   if (!room) {
     notFound();
   }
 
-  const round = await getCurrentRoundState(roomId, room.deck_type);
-
-  if (!round) {
-    notFound();
-  }
-
-  const deck = getDeck(room.deck_type);
+  // Sem tabela de rounds, o estado da rodada não vem mais do SSR — nasce do
+  // cache local (rodada 1 recém-criada, ou último round conhecido desta
+  // aba) e/ou da presence de quem já está conectado (ver
+  // lib/round-gossip.ts). RoomClient mostra "sincronizando…" até resolver.
+  const deck = getDeck(room.deckType);
 
   return (
     <div className="bg-casino flex min-h-screen flex-1 flex-col">
@@ -41,17 +33,10 @@ export default async function RoomPage({
       <div className="flex flex-1 items-center justify-center px-4 py-12">
         <RoomClient
           roomId={roomId}
-          projectName={room.project_name}
-          scrumMasterName={room.scrum_master_name}
-          deckName={deck?.name ?? room.deck_type}
-          deckType={room.deck_type}
-          ticketCode={round.ticketCode}
-          initialRound={{
-            id: round.id,
-            status: round.status,
-            votes: round.votes,
-            stats: round.stats,
-          }}
+          projectName={room.projectName}
+          scrumMasterName={room.scrumMasterName}
+          deckName={deck?.name ?? room.deckType}
+          deckType={room.deckType}
         />
       </div>
     </div>

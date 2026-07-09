@@ -13,6 +13,7 @@ import {
   SelectTrigger,
   SelectValue,
 } from "@/components/ui/select";
+import { storeLastKnownRound } from "@/lib/round-cache";
 import type { CreateRoomResponse } from "@/types/api";
 
 export function CreateRoomForm() {
@@ -48,6 +49,7 @@ export function CreateRoomForm() {
       }
 
       const data = (await res.json()) as CreateRoomResponse;
+      storeLastKnownRound(data.roomId, data.round);
       router.push(`/sala/${data.roomId}?sm=${data.scrumMasterToken}`);
     } catch {
       setError("Falha de conexão. Tente novamente.");
