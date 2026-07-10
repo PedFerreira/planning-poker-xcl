@@ -1,0 +1,15 @@
+name: Purge inactive rooms
+
+on:
+  schedule:
+    - cron: "*/15 * * * *"
+  workflow_dispatch: {}
+
+jobs:
+  purge:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Call purge endpoint
+        run: |
+          curl -sf -X POST "${{ vars.APP_URL }}/api/internal/purge-inactive-rooms" \
+            -H "Authorization: Bearer ${{ secrets.CRON_SECRET }}"
